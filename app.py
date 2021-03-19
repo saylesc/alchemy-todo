@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 import sys
 
 app = Flask(__name__)
@@ -7,20 +8,23 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@localhos
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 # Defines the ToDo Model for our database
 class Todo(db.Model):
    __tablename__ = 'todos'
    id = db.Column(db.Integer, primary_key=True)
    description = db.Column(db.String(), nullable=False)
+   completed = db.Column(db.Boolean, nullable=False, default=False)
 
    # Define the debug data to display
    def __repr__(self):
       return f'<TODO {self.id} {self.description}>'
 
 # Create all tables
-db.create_all()
-
+# Learned how to use migration, so this command is no longer needed
+#     Instead we use 'flask db init/migrate/upgrade/downgrade'
+# db.create_all()
 
 ######## APP ROUTES #######
 @app.route('/')
@@ -44,6 +48,8 @@ def create():
       # add the new todo item to the db and commit
       db.session.add( newTodo )
       db.session.commit()
+
+      # append the todo item to the return body
       body['description'] = newTodo.description
    except:
       error = True
