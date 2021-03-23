@@ -3,7 +3,6 @@
 
 
 ## Migrations were done using the following commands
-createdb example1
 createdb udacity
 flask db init
 flask db migrate

@@ -29,7 +29,7 @@ class Todo(db.Model):
 ######## APP ROUTES #######
 @app.route('/')
 def index():
-   return render_template( 'index.html', data = Todo.query.all() )
+   return render_template( 'index.html', data = Todo.query.order_by('id').all() )
 
 @app.route('/todos/create-todo', methods=['POST'])
 def create():
@@ -67,4 +67,24 @@ def create():
    # Redirect to the main page
    # return redirect( url_for('index') )
 
-   
+@app.route('/todos/<todo_id>/set-completed', methods=['POST'])
+def setComplete(todo_id):
+   error = False
+   body = {}
+   try:
+      completed = request.get_json()['completed']
+      completeTodo = Todo.query.get(todo_id)
+      completeTodo.completed = completed
+
+      db.session.commit()
+   except:
+      error = True
+      db.session.rollback()
+      print(sys.exc_info())
+   finally:
+      db.session.close()
+
+   if error:
+      abort(500)
+   else:
+      return redirect(url_for('index'))

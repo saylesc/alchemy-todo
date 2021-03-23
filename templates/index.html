@@ -5,6 +5,11 @@
        .hidden{
           display: none;
        }
+       ul{
+          list-style: none;
+          padding: 0px;
+          margin: 0px;
+       }
     </style>
   </head>
   <body>
@@ -23,11 +28,37 @@
       <div id="todo-items">
         <ul>
           {% for d in data %}
-          <li>{{ d.description }}</li>
+          <li><input class="check-completed" data-id="{{d.id}}" type="checkbox" 
+            {% if d.completed %} checked {% endif %}/> {{ d.description }}</li>
           {% endfor %}
         </ul>
       </div>
       <script>
+         const checkboxes = document.querySelectorAll(".check-completed")
+         for (let i = 0; i < checkboxes.length; i++){
+            let checkbox = checkboxes[i];
+            checkbox.onchange = function(e){
+               console.log("event", e);
+               const newCompletedState = e.target.checked;
+               const todoId = e.target.dataset.id;
+               fetch('/todos/' + todoId + '/set-completed', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                     completed: newCompletedState
+                  }),
+                  headers: {
+                     'Content-Type': 'application/json'
+                  }
+               })
+               .then(function() {
+                  document.getElementById('error').className = 'hidden';
+               })
+               .catch(function() { 
+                  document.getElementById('error').className = '';
+               })
+            }
+         }
+
          document.getElementById("todo-form").onsubmit = function(e){
             e.preventDefault();
             const newTodoInput = document.getElementById('description');
