@@ -27,17 +27,10 @@ class Todo(db.Model):
 # db.create_all()
 
 ######## APP ROUTES #######
-@app.route('/')
-def index():
-   return render_template( 'index.html', data = Todo.query.order_by('id').all() )
-
 @app.route('/todos/create-todo', methods=['POST'])
 def create():
    # Get the form data here
    newTodoItem = request.get_json()['description']
-
-   #### OLD Way using form
-   # newTodoItem = request.form.get( 'description', 'New todo with no description' )
 
    # Try to add the TODO item. If failure, rollback and report error
    error = False
@@ -51,6 +44,8 @@ def create():
 
       # append the todo item to the return body
       body['description'] = newTodo.description
+      body['id'] = newTodo.id
+      body['completed'] = newTodo.completed
    except:
       error = True
       db.session.rollback()
@@ -63,14 +58,10 @@ def create():
       abort(500)
    else:
       return jsonify(body)
-   #### OLD Way using redirect
-   # Redirect to the main page
-   # return redirect( url_for('index') )
 
 @app.route('/todos/<todo_id>/set-completed', methods=['POST'])
 def setComplete(todo_id):
    error = False
-   body = {}
    try:
       completed = request.get_json()['completed']
       completeTodo = Todo.query.get(todo_id)
@@ -88,3 +79,25 @@ def setComplete(todo_id):
       abort(500)
    else:
       return redirect(url_for('index'))
+
+@app.route('/todos/delete-todo/<todo_id>', methods=['DELETE'])
+def deleteTodo(todo_id):
+   error = False
+   try:
+      Todo.query.filter_by(id=todo_id).delete()
+      db.session.commit()
+   except:
+      error = True
+      db.session.rollback()
+      print(sys.exc_info())
+   finally:
+      db.session.close()
+
+   if error:
+      abort(500)
+   else:
+      return jsonify({ 'success': True })
+
+@app.route('/')
+def index():
+   return render_template( 'index.html', data = Todo.query.order_by('id').all() )
