@@ -11,20 +11,22 @@
          display: inline-block;
          vertical-align: top;
          list-style: none;
-         padding: 0px;
+         padding-right: 10ch;
          margin: 0px;
          width: 320px;
       }
-
+      ul{
+         list-style-type:none;
+      }
       li {
          clear: both;
       }
-      .todo-form-input {
+      .todo-form-input, .todolist-form-input {
          display: flex;
          flex-direction: row;
       }
 
-      .delete-todo-btn {
+      .delete-todo-btn, .delete-todolist-btn{
          color: red;
          -webkit-appearance: none;
          border: none;
@@ -37,30 +39,45 @@
 </head>
 
 <body>
+   <h2>MY Todo Sample App</h2>
    <div class="lists-wrapper" class="container">
-      <button>New List</button>
+      <h4>TODO Lists</h4>
+      <form id="todolist-form" action="/todos/create-todolist" method="POST">
+         <div class='todolist-form-input'>
+            <input type="text" id="listname" name="listName" placeholder="A new List"/>
+            <input type="submit" id="submit-list" value="Create List" />
+         </div>
+      </form>
       <ul id="todo-lists">
          {% for list in lists %}
          <li>
-            <a href="/lists/{{ list.id }}">{{ list.name }}</a>
+            <input class="todolist-check-completed" data-id="{{list.id}}" 
+               type="checkbox" {% if list.completed %} checked {%
+                  endif %} /> 
+               <a href="/lists/{{ list.id }}">{{ list.name }}</a>
+               <button class="delete-todolist-btn" data-id="{{list.id}}">
+                  &cross;
+               </button>
          </li>
          {% endfor %}
       </ul>
    </div>
    <div class="todos-wrapper">
-      <h4>{{active_list.name}}</h4>
+      <h4>Todo List: {{active_list.name}}</h4>
       <form id="todo-form" action="/todos/create-todo" method="POST">
          <div class='todo-form-input'>
-            <input type="text" id="description" name="description" />
-            <input type="submit" id="submit-todo" value="Create" />
+            <input type="text" id="description" name="description" placeholder="A new TODO"/>
+            <input type="submit" id="submit-todo" value="Create TODO" />
          </div>
-         <input type="hidden" id="activeList" value="{{active_list.id}}"
+         <input type="hidden" id="activeList" value="{{active_list.id}}" />
       </form>
       <div id="error" class="hidden">Something went wrong!</div>
       <div>
          <ul id="todo-items">
             {% for todo in todos %}
-            <li><input class="check-completed" data-id="{{todo.id}}" type="checkbox" {% if todo.completed %} checked {%
+            <li>
+               <input class="check-completed" data-id="{{todo.id}}" 
+               type="checkbox" {% if todo.completed %} checked {%
                   endif %} /> {{ todo.description }}
                <button class="delete-todo-btn" data-id="{{todo.id}}">
                   &cross;
@@ -71,7 +88,33 @@
       </div>
    </div>
    <script>
-      const checkboxes = document.querySelectorAll(".check-completed")
+      // Check for completed todo lists
+      const listCheckboxes = document.querySelectorAll(".todolist-check-completed");
+      for (let idx = 0; idx < listCheckboxes.length; idx++)
+      {
+         let listCheckBox = listCheckboxes[idx];
+         listCheckBox.onchange = function(e){
+            const listCheckState = e.target.checked;
+            const todoList = e.target.dataset.id;
+            fetch('/todos/list/' + todoList + '/set-completed', {
+               method: 'POST',
+               body: JSON.stringify({
+                  completed: listCheckState
+               }),
+               headers: {
+                  'Content-Type': 'application/json'
+               }
+            })
+            .then(function () {
+               document.getElementById('error').className = 'hidden';
+            })
+            .catch(function () {
+               document.getElementById('error').className = '';
+            })
+         }
+      }
+      
+      const checkboxes = document.querySelectorAll(".check-completed");
       for (let i = 0; i < checkboxes.length; i++) {
          let checkbox = checkboxes[i];
          checkbox.onchange = function (e) {
@@ -87,12 +130,32 @@
                   'Content-Type': 'application/json'
                }
             })
-               .then(function () {
-                  document.getElementById('error').className = 'hidden';
-               })
-               .catch(function () {
-                  document.getElementById('error').className = '';
-               })
+            .then(function () {
+               document.getElementById('error').className = 'hidden';
+            })
+            .catch(function () {
+               document.getElementById('error').className = '';
+            })
+         }
+      }
+      // Delete List      
+      const deleteListBtns = document.querySelectorAll(".delete-todolist-btn")
+      for (let i = 0; i < deleteListBtns.length; i++) {
+         let delListBtn = deleteListBtns[i];
+         delListBtn.onclick = function (e) {
+            console.log("event", e);
+            const listId = e.target.dataset.id;
+            fetch('/todos/delete-list/' + listId, {
+               method: 'DELETE',
+            })
+            .then(function () {
+               document.getElementById('error').className = 'hidden';
+               let item = e.target.parentElement;
+               item.remove();
+            })
+            .catch(function () {
+               document.getElementById('error').className = '';
+            })
          }
       }
 
@@ -116,6 +179,53 @@
          }
       }
 
+      // Listener for the TODO List form submit
+      const newListInput = document.getElementById('listname');
+      document.getElementById('todolist-form').onsubmit = function(e) {
+         e.preventDefault();
+         
+         fetch('/todos/create-todolist', {
+            method: 'POST',
+            body: JSON.stringify({
+               'listName': newListInput.value,
+            }),
+            headers: {
+               'Content-Type': 'application/json'
+            }
+         })
+         .then(response => response.json())
+         .then(jsonResponse => {
+            // Create new <li> for the new List
+            const newTodoList = document.createElement("li");
+            const checkbox = document.createElement("input");
+            checkbox.type = 'checkbox';
+            checkbox.className = 'todolist-check-completed';
+            checkbox.setAttribute('data-id', jsonResponse.listId);
+            newTodoList.appendChild(checkbox);
+
+            const text = document.createTextNode(' ' + jsonResponse.listName);
+            const listAnchor = document.createElement("a");
+            listAnchor.setAttribute('href', "/lists/" + jsonResponse.listId);
+            listAnchor.appendChild(text);
+            newTodoList.appendChild(listAnchor);
+
+            newTodoList.appendChild(text);
+
+            const delButton = document.createElement("button");
+            delButton.className = 'delete-todolist-btn';
+            delButton.setAttribute('data-id', jsonResponse.listId);
+            delButton.innerHTML = "&cross;";
+            newTodoList.appendChild(delButton);
+
+            document.getElementById('todo-lists').appendChild(newTodoList);
+            document.getElementById('error').className = 'hidden';
+         })
+         .catch(() => {
+            document.getElementById('error').className = '';
+         });
+      };
+
+      // Listener for the TODO Item form submit
       const newTodoInput = document.getElementById('description');
       const activeList = document.getElementById("activeList");
       document.getElementById("todo-form").onsubmit = function (e) {
@@ -131,31 +241,31 @@
                'Content-Type': 'application/json'
             }
          })
-            .then(response => response.json())
-            .then(jsonResponse => {
-               console.log(jsonResponse);
-               const newTodoItem = document.createElement("li");
-               const checkbox = document.createElement("input");
-               checkbox.type = 'checkbox';
-               checkbox.className = 'check-completed';
-               checkbox.setAttribute('data-id', jsonResponse.id);
-               newTodoItem.appendChild(checkbox);
+         .then(response => response.json())
+         .then(jsonResponse => {
+            console.log(jsonResponse);
+            const newTodoItem = document.createElement("li");
+            const checkbox = document.createElement("input");
+            checkbox.type = 'checkbox';
+            checkbox.className = 'check-completed';
+            checkbox.setAttribute('data-id', jsonResponse.id);
+            newTodoItem.appendChild(checkbox);
 
-               const text = document.createTextNode(' ' + jsonResponse.description);
-               newTodoItem.appendChild(text);
+            const text = document.createTextNode(' ' + jsonResponse.description);
+            newTodoItem.appendChild(text);
 
-               const delButton = document.createElement("button");
-               delButton.className = 'delete-todo-btn';
-               delButton.setAttribute('data-id', jsonResponse.id);
-               delButton.innerHTML = "&cross;";
-               newTodoItem.appendChild(delButton);
+            const delButton = document.createElement("button");
+            delButton.className = 'delete-todo-btn';
+            delButton.setAttribute('data-id', jsonResponse.id);
+            delButton.innerHTML = "&cross;";
+            newTodoItem.appendChild(delButton);
 
-               document.getElementById('todo-items').appendChild(newTodoItem);
-               document.getElementById('error').className = 'hidden';
-            })
-            .catch(() => {
-               document.getElementById('error').className = '';
-            });
+            document.getElementById('todo-items').appendChild(newTodoItem);
+            document.getElementById('error').className = 'hidden';
+         })
+         .catch(() => {
+            document.getElementById('error').className = '';
+         });
       }
    </script>
    </div>
